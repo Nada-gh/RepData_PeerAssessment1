@@ -1,25 +1,166 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
+title: 'Reproducible Research: Peer Assessment 1'
+output:
   html_document:
-    keep_md: true
+    keep_md: yes
+  pdf_document: default
 ---
 
 
 ## Loading and preprocessing the data
 
+First, we load the dataset of the personal movement using activity monitoring devices.  
+
+
+```{r, echo=TRUE}
+unzip(zipfile = "activity.zip")
+
+Activity_data <- read.csv("activity.csv", header = TRUE)
+```
+
+
+Second, we transform the variables to be suitable for the coming tasks. 
+We transform the variable **date** into date format and then use the function **weekdays** to get the corresponding days for everyday.
+
+
+```{r,echo=TRUE}
+
+Activity_data$date<-as.Date.factor(Activity_data$date)
+
+WeekDys<- weekdays(Activity_data$date)
+
+Activity_data<-cbind(Activity_data,WeekDys)
+
+names(Activity_data)[4]<-"Weekdy"
+
+Activity_data$interval<-as.factor(Activity_data$interval)
+
+```
 
 
 ## What is mean total number of steps taken per day?
 
+Calculate the total number of steps taken ber day using **sum** function. We first summarize the **data** and **steps** pair of variables to get the total number of steps taken every day.
 
+```{r, echo=TRUE}
+
+library(ggplot2)
+
+StepsBerDy<- aggregate(steps~date, data = Activity_data, FUN = sum, na.rm=TRUE)
+n <- ggplot(data = StepsBerDy, aes(steps))+ geom_histogram()
+n +xlab("Total number of steps taken ber day")+ ylab("Frequency")+ggtitle("Total number of steps taken per day")
+                      
+```
+
+So far, we calculated the total number of steps taken ber day in the previuos section. Now, we need to calculate the mean and the median of the total number of steps
+
+```{r, echo=TRUE, results='asis'}
+Tot_mean <- mean(StepsBerDy$steps)
+Tot_med <- median(StepsBerDy$steps)
+Tot_mean
+Tot_med
+```
+ 
+So, we can notice that the values of the mean and the median of the total number of steps do not have a big difference!
 
 ## What is the average daily activity pattern?
 
+```{r, echo=TRUE}
+library(ggplot2)
 
+ AvgStepsBerInv<-aggregate(steps~interval, data = Activity_data, FUN = mean, na.rm=TRUE)
+ 
+plot(AvgStepsBerInv$interval, AvgStepsBerInv$steps,type = "l", xlab="Interval", ylab="Average of Steps", title="The average daily activity pattern",col="red")
+
+      
+```
+
+We can also figure out which 5-min interval that contains the maximum number of steps with **which.max** function.
+
+```{r, echo=TRUE, results='asis'}
+AvgStepsBerInv[which.max(AvgStepsBerInv$steps),]
+
+```
 
 ## Imputing missing values
 
+We first calculate the total number of missing values in all of the observations
+
+```{r, echo=TRUE}
+TotNA<- with(Activity_data,sum(is.na(steps)))
+
+```
+
+
+So 2304 out of 17568 observations have no values(NA). As well, if we view the activity dataset we can notice that those missing variables are concentrated in only particular days like **2012-10-01** and **2012-11-30**. On the other hand, the other days have no missing data.
+
+
+```{r, echo=TRUE, results= 'asis'}
+library(tidyverse)
+L<-split(Activity_data,as.factor(Activity_data$date))
+map(L, ~sum(is.na(.)))
+
+```
+ 
+It looks like that in some days the participants did not excersize or there was a problem in recording the activity! 
+
+In this case, I think the most efficient strategy to deal with those days that are fully missing the number of steps is to omit or ignor them since they are only present in particular days. There is no point to take the 
+
+
+```{r, echo=TRUE}
+Mod_data<-Activity_data[!is.na(Activity_data$steps),]
+
+
+```
+
+
+Now, let's explore the distribution of our data after omitting the observations with missing values.
+
+```{r, echo=TRUE}
+
+library(ggplot2)
+
+StepsBerDy2<- aggregate(steps~date, data = Mod_data, FUN = sum)
+n <- ggplot(data = StepsBerDy2, aes(steps))+ geom_histogram()
+n +xlab("Total number of steps taken ber day")+ ylab("Frequency")+ggtitle("Total number of steps taken per day after imputing the missing data")
+```
+
+Not surprisingly, we can see that there was no noticable difference between the two histograms before and after imputing the missing data. That, indeed, occures because we the graphic system of ggplot package, by defult, ignors the missing data exactly as we did in the last step of the analysis. 
+
+```{r, echo=TRUE, results='asis'}
+Tot_mean2 <- mean(StepsBerDy2$steps)
+Tot_med2 <- median(StepsBerDy2$steps)
+Tot_mean
+Tot_med
+
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+In this section, we use the package **timeDate** functions to check whether a given day is weekday or weekend! After that, we explore the activity distribution in weekdays and weekends as following:
+
+
+```{r, echo=TRUE, results='asis'}
+##install.packages("timeDate")
+library(timeDate)
+library(dplyr)
+
+
+Mod_data2<- Mod_data %>% mutate(DyType=as.factor(ifelse(isWeekday(Mod_data$date),"WDy","WEnd")))
+
+
+Avg_data<- Mod_data2 %>% group_by(DyType,interval) %>% summarise(avgsteps=mean(steps))
+
+
+
+## average number of steps taken, averaged across all weekday days or weekend days 
+
+t<- ggplot(Avg_data, aes(x=interval,y=avgsteps))
+t+ geom_jitter() + facet_wrap(~ DyType)+xlab("5-min Intervals") + ylab("Average steps taken ber day")+ggtitle("Average number of steps taken across all weekdays vs. weekends"
+)
+
+```
+
+
+
